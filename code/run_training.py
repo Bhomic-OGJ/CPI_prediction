@@ -133,7 +133,7 @@ class Tester(object):
 
 
 def load_tensor(file_name, dtype):
-    return [dtype(d).to(device) for d in np.load(file_name + '.npy')]
+    return [dtype(d).to(device) for d in np.load(file_name + '.npy', allow_pickle=True)]
 
 
 def load_pickle(file_name):
