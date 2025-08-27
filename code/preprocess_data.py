@@ -116,6 +116,7 @@ if __name__ == "__main__":
         i_jbond_dict = create_ijbonddict(mol)
 
         fingerprints = extract_fingerprints(atoms, i_jbond_dict, radius)
+        print("INNERLOG: fingerprints: ", fingerprints.shape)
         compounds.append(fingerprints)
 
         adjacency = create_adjacency(mol)
@@ -132,6 +133,9 @@ if __name__ == "__main__":
 
     with open(dir_input + 'Smiles.txt', 'w') as f:
         f.write(Smiles)
+
+    # print("LOG: compounds: ",np.array(compounds).shape)
+
     np.save(dir_input + 'compounds', compounds)
     np.save(dir_input + 'adjacencies', adjacencies)
     np.save(dir_input + 'proteins', proteins)

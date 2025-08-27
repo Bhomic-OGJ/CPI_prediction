@@ -2,9 +2,9 @@
 setlocal EnableDelayedExpansion
 
 :: Set dataset
-set DATASET=human
+::set DATASET=human
 :: set DATASET=celegans
-:: set DATASET=yourdata
+set DATASET=b_cancer
 
 :: Set radius
 :: set radius=1
