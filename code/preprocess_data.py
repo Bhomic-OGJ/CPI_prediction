@@ -136,10 +136,18 @@ if __name__ == "__main__":
 
     # print("LOG: compounds: ",np.array(compounds).shape)
 
-    np.save(dir_input + 'compounds', compounds)
-    np.save(dir_input + 'adjacencies', adjacencies)
-    np.save(dir_input + 'proteins', proteins)
-    np.save(dir_input + 'interactions', interactions)
+    # np.save(dir_input + 'compounds', compounds)
+    # np.save(dir_input + 'adjacencies', adjacencies)
+    # np.save(dir_input + 'proteins', proteins)
+    # np.save(dir_input + 'interactions', interactions)
+
+    np.save(dir_input + 'compounds.npy', np.array(compounds, dtype=object), allow_pickle=True)
+    np.save(dir_input + 'adjacencies.npy', np.array(adjacencies, dtype=object), allow_pickle=True)  # Apply similar fix if needed
+    np.save(dir_input + 'proteins.npy', np.array(proteins, dtype=object), allow_pickle=True)  # Apply similar fix if needed
+    
+    # Save interactions as a numeric array
+    np.save(dir_input + 'interactions.npy', np.array(interactions, dtype=np.int64))
+
     dump_dictionary(fingerprint_dict, dir_input + 'fingerprint_dict.pickle')
     dump_dictionary(word_dict, dir_input + 'word_dict.pickle')
 
