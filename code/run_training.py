@@ -9,7 +9,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from sklearn.metrics import roc_auc_score, precision_score, recall_score
+from sklearn.metrics import roc_auc_score, precision_score, recall_score, accuracy_score
+from sklearn.model_selection import StratifiedShuffleSplit
 
 
 class CompoundProteinInteractionPrediction(nn.Module):
@@ -106,6 +107,7 @@ class Trainer(object):
         return loss_total
 
 
+"""
 class Tester(object):
     def __init__(self, model):
         self.model = model
@@ -127,6 +129,35 @@ class Tester(object):
     def save_AUCs(self, AUCs, filename):
         with open(filename, 'a') as f:
             f.write('\t'.join(map(str, AUCs)) + '\n')
+
+    def save_model(self, model, filename):
+        torch.save(model.state_dict(), filename)
+"""
+
+
+# updated tester class to calculate the accuracies also
+class Tester(object):
+    def __init__(self, model):
+        self.model = model
+
+    def test(self, dataset):
+        N = len(dataset)
+        T, Y, S = [], [], []
+        for data in dataset:
+            (correct_labels, predicted_labels,
+             predicted_scores) = self.model(data, train=False)
+            T.append(correct_labels)
+            Y.append(predicted_labels)
+            S.append(predicted_scores)
+        AUC = roc_auc_score(T, S)
+        precision = precision_score(T, Y)
+        recall = recall_score(T, Y)
+        accuracy = accuracy_score(T, Y)
+        return AUC, precision, recall, accuracy
+
+    def save_AUCs(self, metrics, filename):
+        with open(filename, 'a') as f:
+            f.write('\t'.join(map(str, metrics)) + '\n')
 
     def save_model(self, model, filename):
         torch.save(model.state_dict(), filename)
@@ -152,6 +183,76 @@ def split_dataset(dataset, ratio):
     dataset_1, dataset_2 = dataset[:n], dataset[n:]
     return dataset_1, dataset_2
 
+
+# Adding the code for stratify splitting the dataset
+def stratified_split_dataset(dataset, train_ratio=0.8, val_ratio=0.1, test_ratio=0.1, seed=1234):
+    """
+    Split dataset into train, validation, and test sets with stratification based on protein sequences.
+    
+    Args:
+        dataset: List of tuples (compounds, adjacencies, proteins, interactions)
+        train_ratio: Proportion of data for training (default: 0.8)
+        val_ratio: Proportion of data for validation (default: 0.1)
+        test_ratio: Proportion of data for testing (default: 0.1)
+        seed: Random seed for reproducibility (default: 1234)
+    
+    Returns:
+        dataset_train: Training dataset
+        dataset_val: Validation dataset
+        dataset_test: Test dataset
+    """
+    # Extract protein sequences and create unique labels for stratification
+    protein_sequences = [item[2] for item in dataset]  # Assuming proteins is the 3rd element in tuple
+    
+    # Convert protein sequences to unique categorical labels
+    unique_proteins = {}
+    protein_labels = []
+    for seq in protein_sequences:
+        # Convert sequence to a hashable string representation
+        if isinstance(seq, (list, np.ndarray)):
+            # If sequence is a list or array, convert to string (e.g., join if it's a list of numbers)
+            seq_str = str(tuple(seq))  # Convert to tuple for hashing
+        elif isinstance(seq, str):
+            seq_str = seq
+        else:
+            # Handle other types (e.g., custom objects) by converting to string
+            seq_str = str(seq)
+        
+        # Create a unique label for each unique protein sequence
+        if seq_str not in unique_proteins:
+            unique_proteins[seq_str] = len(unique_proteins)
+        protein_labels.append(unique_proteins[seq_str])
+    
+    # Convert dataset to numpy array for easier indexing
+    dataset = np.array(dataset, dtype=object)
+    
+    # First split: separate train (80%) from val+test (20%)
+    sss = StratifiedShuffleSplit(n_splits=1, train_size=train_ratio, random_state=seed)
+    train_idx, val_test_idx = next(sss.split(dataset, protein_labels))
+    
+    # Split val+test (20%) into val (10%) and test (10%)
+    val_test_ratio = val_ratio / (val_ratio + test_ratio)  # e.g., 0.1/(0.1+0.1) = 0.5
+    sss_val_test = StratifiedShuffleSplit(n_splits=1, train_size=val_test_ratio, random_state=seed)
+    
+    # Extract protein labels for val+test subset
+    val_test_labels = [protein_labels[i] for i in val_test_idx]
+    val_idx, test_idx = next(sss_val_test.split(val_test_idx, val_test_labels))
+    
+    # Convert relative indices (val_idx, test_idx) to absolute indices
+    val_idx = val_test_idx[val_idx]
+    test_idx = val_test_idx[test_idx]
+    
+    # Create final datasets
+    dataset_train = dataset[train_idx].tolist()
+    dataset_val = dataset[val_idx].tolist()
+    dataset_test = dataset[test_idx].tolist()
+    
+    # Verify split sizes
+    print(f"Train set size: {len(dataset_train)} ({len(dataset_train)/len(dataset):.2%})")
+    print(f"Validation set size: {len(dataset_val)} ({len(dataset_val)/len(dataset):.2%})")
+    print(f"Test set size: {len(dataset_test)} ({len(dataset_test)/len(dataset):.2%})")
+    
+    return dataset_train, dataset_val, dataset_test
 
 if __name__ == "__main__":
 
@@ -187,8 +288,20 @@ if __name__ == "__main__":
     """Create a dataset and split it into train/dev/test."""
     dataset = list(zip(compounds, adjacencies, proteins, interactions))
     dataset = shuffle_dataset(dataset, 1234)
+
+
+    """
+    Simple splitting code
     dataset_train, dataset_ = split_dataset(dataset, 0.8)
     dataset_dev, dataset_test = split_dataset(dataset_, 0.5)
+    """
+
+    # Create and split the dataset
+    dataset_train, dataset_dev, dataset_test = stratified_split_dataset(dataset, train_ratio=0.8, val_ratio=0.1, test_ratio=0.1, seed=1234)
+
+    print("\n", "dataset_train: ",dataset_train, " | dataset_dev: ", dataset_dev, " | dataset_test: ",dataset_test)
+    
+
 
     """Set a model."""
     torch.manual_seed(1234)
@@ -200,7 +313,7 @@ if __name__ == "__main__":
     file_AUCs = '../output/result/AUCs--' + setting + '.txt'
     file_model = '../output/model/' + setting
     AUCs = ('Epoch\tTime(sec)\tLoss_train\tAUC_dev\t'
-            'AUC_test\tPrecision_test\tRecall_test')
+            'AUC_test\tPrecision_test\tRecall_test\tAccuracy_test')
     with open(file_AUCs, 'w') as f:
         f.write(AUCs + '\n')
 
@@ -216,13 +329,13 @@ if __name__ == "__main__":
 
         loss_train = trainer.train(dataset_train)
         AUC_dev = tester.test(dataset_dev)[0]
-        AUC_test, precision_test, recall_test = tester.test(dataset_test)
+        AUC_test, precision_test, recall_test, accuracy = tester.test(dataset_test)
 
         end = timeit.default_timer()
         time = end - start
 
         AUCs = [epoch, time, loss_train, AUC_dev,
-                AUC_test, precision_test, recall_test]
+                AUC_test, precision_test, recall_test, accuracy]
         tester.save_AUCs(AUCs, file_AUCs)
         tester.save_model(model, file_model)
 
