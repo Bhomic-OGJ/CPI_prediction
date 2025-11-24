@@ -5,6 +5,7 @@ import timeit
 import numpy as np
 
 import torch
+import os
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
@@ -210,8 +211,17 @@ if __name__ == "__main__":
     trainer = Trainer(model, lr, weight_decay)
     tester = Tester(model)
 
-    file_AUCs = '../output/result/AUCs--' + setting + '.txt'
-    file_model = '../output/model/' + setting
+    # Create GRU-specific output directories so existing outputs remain intact
+    base_out = '../output/gru'
+    result_out = os.path.join(base_out, 'result')
+    model_out_root = os.path.join(base_out, 'model')
+    os.makedirs(result_out, exist_ok=True)
+    os.makedirs(model_out_root, exist_ok=True)
+
+    file_AUCs = os.path.join(result_out, 'AUCs--' + setting + '.txt')
+    # Per-setting model directory to avoid overwriting other settings
+    model_dir = os.path.join(model_out_root, setting)
+    os.makedirs(model_dir, exist_ok=True)
     AUCs = ('Epoch\tTime(sec)\tLoss_train\tAUC_dev\t'
             'AUC_test\tPrecision_test\tRecall_test\tAccuracy_test')
     with open(file_AUCs, 'w') as f:
@@ -235,6 +245,8 @@ if __name__ == "__main__":
         AUCs = [epoch, time, loss_train, AUC_dev,
                 AUC_test, precision_test, recall_test, accuracy]
         tester.save_AUCs(AUCs, file_AUCs)
-        tester.save_model(model, file_model)
+        # Save per-epoch model in the GRU-specific model directory
+        model_filename = os.path.join(model_dir, f'model_epoch{epoch}.pt')
+        tester.save_model(model, model_filename)
 
         print('\t'.join(map(str, AUCs)))
