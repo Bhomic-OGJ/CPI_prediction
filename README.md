@@ -130,3 +130,7 @@ bridging two different architectures (GNN and CNN).
   year={2018}
 }
 ```
+
+
+##Running steps for gru file
+python .\train_separate.py b_cancer 2 3 10 3 11 3 3 0.001 0.5 10 1e-6 100 b_cancer--radius2--ngram3--dim10--layer_gnn3--window11--layer_cnn3--layer_output3--lr1e-3--lr_decay0.5--decay_interval10--weight_decay1e-6--iteration100
