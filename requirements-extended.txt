@@ -1,1 +1,6 @@
 pandas
+numpy
+scikit-learn
+# Optional (recommended): rdkit (install via conda), biopython
+# rdkit
+# biopython
